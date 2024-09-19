@@ -27,7 +27,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class Config:
     def __init__(self):
         self.TASK_NAME = "Emotion"
-        self.ROOT = "/var/data/student_home/agnelli/VATE"
+        self.ROOT = "/var/data/student_home/agnelli/VATE_working_repo"
         self.DATASET = CMU_MOSIDataset
         self.DATASET_NAME = "CMU_MOSI"
         self.OUTPUT_DIR = f"{self.ROOT}/output/{self.DATASET_NAME}"
@@ -180,7 +180,7 @@ class  main():
         metrics["Test"]["Std Loss"].append(std_loss)
         metrics["Test"]["Std Accuracy"].append(std_accuracy)
 
-        output_path = config.ROOT + "results/downstream_finetuned_CMU-MOSI.json"
+        output_path = config.ROOT + "/results/downstream_finetuned_CMU-MOSI.json"
         with open(output_path, "w") as f:
             json.dump(metrics, f, indent=4)
 

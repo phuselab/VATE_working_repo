@@ -107,11 +107,12 @@ class train_test_downstream():
 
 
 class train_test_downstream_regressive():
-    def __init__(self, optimizer, criterion, device):
+    def __init__(self, optimizer, criterion, device, config):
          pass
          self.optimizer = optimizer
          self.criterion = criterion
          self.device = device
+         self.config = config
 
     def train(self, model, loader):
         model.to(self.device)
@@ -199,7 +200,7 @@ class train_test_downstream_regressive():
 
             progress_bar(epoch, epochs, train_epoch_loss, train_epoch_acc)
         
-        torch.save(best_model.state_dict(), "/home/uniusr03/new_dataset/results/best_model.pt")
+        torch.save(best_model.state_dict(), self.config.OUTPUT_DIR + "/best_model.pt")
         print(f"CURRENT ACCURACY: {valid_epoch_acc:.4f} - LOSS: {valid_epoch_loss:.4f}")
         del model, train_loader, test_loader
         torch.cuda.empty_cache()
