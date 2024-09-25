@@ -25,11 +25,12 @@ class RAVDESSDataset(DatasetFS):
     - Actor (01 to 24. Odd numbered actors are male, even numbered actors are female).
     """
 
-    def __init__(self, args: Args, ext: str, verbose=0):
+    def __init__(self, args: Args, ext: str, verbose=0, task = None):
         # super class's constructor
         super().__init__(args, ext, verbose)
 
         self.info_path = os.path.join(args.DATASET_ARGS["data_path"], "info.txt")
+        self.task = task
 
         # set class names
         if args.DATASET_ARGS["store"]:
@@ -52,8 +53,10 @@ class RAVDESSDataset(DatasetFS):
         for fname in self.data_frame["filename"]:
             fname = fname.split(".")[-2]
             s = fname.split("-")
-            # classes.append(emotions[s[2]])
-            classes.append(emotions[s[3]])
+            if self.task == "emot_int":
+                classes.append(int(s[2])*int(s[3])-1)
+            else:
+                classes.append(int(s[2])-1)
             actors.append(s[6])
 
         # replaces classes in the serie

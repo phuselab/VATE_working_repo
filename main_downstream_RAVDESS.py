@@ -25,7 +25,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class Config:
     def __init__(self):
         self.TASK_NAME = "Emotion"
-        self.ROOT = "/var/data/student_home/agnelli/VATE"
+        self.ROOT = "/var/data/student_home/agnelli/VATE_working_repo"
         self.DATASET = RAVDESSDataset
         self.DATASET_NAME = "RAVDESS"
         self.OUTPUT_DIR = f"{self.ROOT}/output/{self.DATASET_NAME}"
@@ -54,29 +54,36 @@ class LoaderDataset(Dataset):
     def __getitem__(self, idx):
         item_video = self.x_fold_video[idx]
         item_audio = self.x_fold_audio[idx]
-        label = self.get_target(self.y_fold[idx])
+        # label = self.get_target(self.y_fold[idx])
+        label = self.y_fold[idx]
         return item_video, item_audio, label
     
-    def get_target(self, y, num_classes = 8):
-        target = 0
-        emotions = ["neutral", "happy", "disgust", "angry", "calm", "fearful", "sad", "surprised"]
-        for i, emotion in enumerate(emotions):
-            if y == emotion:
-                target = i
-        return target
+    # def get_target(self, y):
+    #     target = 0
+    #     emotions = ["neutral", "happy", "disgust", "angry", "calm", "fearful", "sad", "surprised"]
+    #     for i, emotion in enumerate(emotions):
+    #         if y == emotion:
+    #             target = i
+    #     return target
+    
 
 class  main():
-    def __init__(self, config, num_epochs, batch_size, learning_rate, store):
+    def __init__(self, config, num_epochs, batch_size, learning_rate, store, task):
         self.config = config
         self.store = store
         self.num_epochs = num_epochs
         self.batch_size = batch_size
         self.learning_rate = learning_rate
+        self.task = task
     
     def training(self):
         image_processor = VivitImageProcessor.from_pretrained("google/vivit-b-16x2-kinetics400")
         model_path = os.path.join(config.ROOT, "output/VATE/best_model_contrastive.pt")
-        model = Downstream_model_finetuned(200, 8, model_path)
+        if task == "emot_int":
+            out_channels = 16
+        else:
+            out_channels = 8
+        model = Downstream_model_finetuned(200, out_channels, model_path)
 
         model_video = VivitForVideoClassification.from_pretrained("google/vivit-b-16x2-kinetics400")
         bundle = torchaudio.pipelines.HUBERT_BASE
@@ -86,11 +93,11 @@ class  main():
         optimizer = optim.Adam(model.parameters(), lr=self.learning_rate)
 
         store = self.store
-        RAVDESS = RAVDESSDataset(self.config, ext = 'mp4', verbose=1)
+        RAVDESS = RAVDESSDataset(self.config, ext = 'mp4', verbose=1, task = task)
         video_media = Video(
                    self.config, dataset=RAVDESS, filename=self.config.MEDIA["Video"]["pkl_fname"], store=self.config.MEDIA["Video"]["store"], store_info=config.MEDIA["Video"]["store_info"], verbose=1
                 )
-        RAVDESS = RAVDESSDataset(config, ext = 'wav', verbose=1)
+        RAVDESS = RAVDESSDataset(config, ext = 'wav', verbose=1, task = task)
         audio_media = Audio(
                     self.config, dataset=RAVDESS, filename=self.config.MEDIA["Audio"]["pkl_fname"], store=self.config.MEDIA["Audio"]["store"], store_info=self.config.MEDIA["Audio"]["store_info"], verbose=1
                 )
@@ -115,7 +122,7 @@ class  main():
                 train_loader_video = []
                 train_loader_audio = []
                 for i in trange(len(x_train_loader)):
-                    # if i<4:
+                    if i<4:
                         video_media.load_video_frames(index = x_train_loader[i])
                         item = video_media.frames
                         item = frame_resampling_np(item, 32)
@@ -135,7 +142,7 @@ class  main():
                 test_loader_video = []
                 test_loader_audio = []
                 for i in trange(len(x_test_loader)):
-                    # if i<1:
+                    if i<1:
                         video_media.load_video_frames(index = x_test_loader[i])
                         item = video_media.frames
                         item = frame_resampling_np(item, 32)
@@ -174,6 +181,8 @@ class  main():
                 pathout = os.path.join(self.config.ROOT, self.config.OUTPUT_DIR, "test_loader.pkl")
                 with open(pathout, 'rb') as handle:
                     test_loader = pickle.load(handle)
+                train_loader.y_fold = y_train_loader
+                test_loader.y_fold = y_test_loader
 
             train_loader = DataLoader(train_loader, batch_size=self.batch_size, shuffle=True)
             test_loader = DataLoader(test_loader, batch_size=self.batch_size, shuffle=True)
@@ -200,9 +209,10 @@ class  main():
 
 if __name__ == "__main__":
     config = Config()
+    task = "emot_int" #emot_est
     store = False
     num_epochs = 10
     batch_size = 64
     learning_rate = 0.01
-    training = main(config, num_epochs, batch_size, learning_rate, store)
+    training = main(config, num_epochs, batch_size, learning_rate, store, task)
     training.training()
