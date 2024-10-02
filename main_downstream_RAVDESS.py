@@ -114,79 +114,73 @@ class  main():
         loss = []
         accuracy = []
 
+        if store:
+                loader_video = []
+                loader_audio = []
+                for i in trange(RAVDESS.size()):
+                    # if i<4:
+                        video_media.load_video_frames(index = i)
+                        item = video_media.frames
+                        item = frame_resampling_np(item, 32)
+                        item = image_processor(list(item), return_tensors="pt")
+                        with torch.no_grad():
+                            item["pixel_values"] = item["pixel_values"].squeeze(1)
+                            item = model_video(**item).logits.squeeze(0)
+                        loader_video.append(item)
+
+                        audio_media.load_audio(index = i)
+                        item_audio = audio_media.compute_feature_hubert()
+                        with torch.no_grad():
+                            item_audio, _ = model_audio.extract_features(item_audio)
+                            item_audio = item_audio[-1][0].mean(0)
+                        loader_audio.append(item_audio)
+
+                pathout = os.path.join(self.config.ROOT, self.config.OUTPUT_DIR, "loader_audio.pkl")
+                print("Storing the audio loader...")
+                with open(pathout, 'wb') as handle:
+                    pickle.dump(loader_audio, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                print("Loader stored into file: " + pathout)
+                pathout = os.path.join(self.config.ROOT, self.config.OUTPUT_DIR, "loader_video.pkl")
+                print("Storing the video loader...")
+                with open(pathout, 'wb') as handle:
+                    pickle.dump(loader_video, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                print("Loader stored into file: " + pathout)
+        else:
+            print("Loading the audio loader...")
+            pathout = os.path.join(self.config.ROOT, self.config.OUTPUT_DIR, "loader_audio.pkl")
+            with open(pathout, 'rb') as handle:
+                loader_audio = pickle.load(handle)
+            print("Loading the video loader...")
+            pathout = os.path.join(self.config.ROOT, self.config.OUTPUT_DIR, "loader_video.pkl")
+            with open(pathout, 'rb') as handle:
+                loader_video = pickle.load(handle)
+             
+
         for j in range(5):
             x_train_loader, x_test_loader, y_train_loader, y_test_loader = RAVDESS.train_test_split(five_fold=j)
 
             max_frame = 200
-            if store:
-                train_loader_video = []
-                train_loader_audio = []
-                for i in trange(len(x_train_loader)):
-                    if i<4:
-                        video_media.load_video_frames(index = x_train_loader[i])
-                        item = video_media.frames
-                        item = frame_resampling_np(item, 32)
-                        item = image_processor(list(item), return_tensors="pt")
-                        with torch.no_grad():
-                            item["pixel_values"] = item["pixel_values"].squeeze(1)
-                            item = model_video(**item).logits.squeeze(0)
-                        train_loader_video.append(item)
+            train_loader_video = []
+            train_loader_audio = []
+            for i in trange(len(x_train_loader)):
+                # if i<4:
+                    train_loader_video.append(loader_video[x_train_loader[i]])
+                    train_loader_audio.append(loader_audio[x_train_loader[i]])
 
-                        audio_media.load_audio(index = x_train_loader[i])
-                        item_audio = audio_media.compute_feature_hubert()
-                        with torch.no_grad():
-                            item_audio, _ = model_audio.extract_features(item_audio)
-                            item_audio = item_audio[-1][0].mean(0)
-                        train_loader_audio.append(item_audio)
-
-                test_loader_video = []
-                test_loader_audio = []
-                for i in trange(len(x_test_loader)):
-                    if i<1:
-                        video_media.load_video_frames(index = x_test_loader[i])
-                        item = video_media.frames
-                        item = frame_resampling_np(item, 32)
-                        item = image_processor(list(item), return_tensors="pt")
-                        with torch.no_grad():
-                            item["pixel_values"] = item["pixel_values"].squeeze(1)
-                            item = model_video(**item).logits.squeeze(0)
-                        test_loader_video.append(item)
-
-                        audio_media.load_audio(index = x_test_loader[i])
-                        item_audio = audio_media.compute_feature_hubert()
-                        with torch.no_grad():
-                            item_audio, _ = model_audio.extract_features(item_audio)
-                            item_audio = item_audio[-1][0].mean(0)
-                        test_loader_audio.append(item_audio)
+            test_loader_video = []
+            test_loader_audio = []
+            for i in trange(len(x_test_loader)):
+                # if i<1:
+                    test_loader_video.append(loader_video[x_test_loader[i]])
+                    test_loader_audio.append(loader_audio[x_test_loader[i]])
 
 
-                train_loader = LoaderDataset(train_loader_video, train_loader_audio, y_train_loader)
-                test_loader = LoaderDataset(test_loader_video, test_loader_audio, y_test_loader)
-                pathout = os.path.join(self.config.ROOT, self.config.OUTPUT_DIR, "train_loader.pkl")
-                print("Storing train loader...")
-                with open(pathout, 'wb') as handle:
-                    pickle.dump(train_loader, handle, protocol=pickle.HIGHEST_PROTOCOL)
-                print("Train loader stored into file: " + pathout)
-                print("Storing test loader...")
-                pathout = os.path.join(self.config.ROOT, self.config.OUTPUT_DIR, "test_loader.pkl")
-                with open(pathout, 'wb') as handle:
-                    pickle.dump(test_loader, handle, protocol=pickle.HIGHEST_PROTOCOL)
-                print("Test loader stored into file: " + pathout)
-            else:
-                print("Loading train loader...")
-                pathout = os.path.join(self.config.ROOT, self.config.OUTPUT_DIR, "train_loader.pkl")
-                with open(pathout, 'rb') as handle:
-                    train_loader = pickle.load(handle)
-                print("Loading test loader...")
-                pathout = os.path.join(self.config.ROOT, self.config.OUTPUT_DIR, "test_loader.pkl")
-                with open(pathout, 'rb') as handle:
-                    test_loader = pickle.load(handle)
-                train_loader.y_fold = y_train_loader
-                test_loader.y_fold = y_test_loader
+            train_loader = LoaderDataset(train_loader_video, train_loader_audio, y_train_loader)
+            test_loader = LoaderDataset(test_loader_video, test_loader_audio, y_test_loader)
 
             train_loader = DataLoader(train_loader, batch_size=self.batch_size, shuffle=True)
             test_loader = DataLoader(test_loader, batch_size=self.batch_size, shuffle=True)
-
+            
             Training = train_test_downstream(optimizer, criterion, device, self.config)
             acc, ls = Training.training(self.num_epochs, train_loader, test_loader, model)
 
